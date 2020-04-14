@@ -4,6 +4,7 @@ from imutils.video import FPS
 import imutils
 import cv2
 import numpy as np
+from gpiozero import PWMOutputDevice
 
 def average(frame):
     return np.average(frame)
@@ -32,13 +33,17 @@ def main():
     size = 600
     n_rows = 3
     n_cols = 3
+    led_pins = [4, 14, 15, 17, 18, 27, 22, 23, 24]
+    pwm_outputs = [PWMOutputDevice(x) for x in led_pins]
     
     while True:
         frame = vs.read()
         frame = cv2.resize(frame, (size, size))
         # calculate average for tiles:
         tile_avgs = average_rgb_tiles(frame, n_rows, n_cols)
-        print(tile_avgs)
+        
+        for pwm, avg in zip(pwm_outputs, tile_avgs):
+            pwm.value = avg
         
         cv2.imshow("Frame", frame)
         key = cv2.waitKey(1) & 0xFF
