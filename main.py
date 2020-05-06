@@ -7,7 +7,7 @@ from utils import average_tiles
 from dataclasses import dataclass
 
 def get_pwm_outputs():
-    led_pins = [4, 14, 15, 17, 18, 27, 22, 23, 24]
+    led_pins = [4, 14, 15, 17, 18, 27, 22, 23, 24, 25]
     return [PWMOutputDevice(x) for x in led_pins]
 
 def get_sections_for_half():
@@ -61,6 +61,7 @@ def run_stereo():
             color_image = np.asanyarray(color_frame.get_data())
             
             tile_avgs = average_tiles(depth_image, section_coords, run_config.max_range, depth_scale)
+            assert len(tile_avgs) == len(pwm_outputs)
             for pwm, tile_avg in zip(pwm_outputs, tile_avgs):
                 pwm.value = 1 - tile_avg
                 
