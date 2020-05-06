@@ -4,27 +4,46 @@ import numpy as np
 from gpiozero import PWMOutputDevice
 import pyrealsense2 as rs
 from utils import average_tiles
-
+from dataclasses import dataclass
 
 def get_pwm_outputs():
     led_pins = [4, 14, 15, 17, 18, 27, 22, 23, 24]
     return [PWMOutputDevice(x) for x in led_pins]
 
+def get_sections_for_half():
+    top = [0,0, 120, 320]
+    middle_left = [120, 0, 360, 100]
+    middle_center = [120, 100, 360, 220]
+    middle_right =  [120, 220, 360, 320]
+    bottom = [320, 0, 480, 320]
+    return np.array([top, middle_left, middle_center, middle_right, bottom])
+
+def get_sections(config):
+    left = get_sections_for_half()
+    right = [[top_left_x, top_left_y + int(config.width/2), bottom_left_x, bottom_left_y + int(config.width/2)] for
+              top_left_x, top_left_y, bottom_left_x, bottom_left_y in left]
+    return [left, right]
+
+@dataclass
+class RunConfig:
+    width: int = 640
+    height: int = 480
+    max_range: int = 3
+    
 def run_stereo():
     # Configure depth and color streams
+    run_config = RunConfig(640, 480, 3)
     pipeline = rs.pipeline()
-    config = rs.config()
-    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+    realsense_config = rs.config()
+    realsense_config.enable_stream(rs.stream.depth, run_config.width, run_config.height, rs.format.z16, 30)
+    realsense_config.enable_stream(rs.stream.color, run_config.width, run_config.height, rs.format.bgr8, 30)
     
     # Start streaming
-    profile = pipeline.start(config)
+    profile = pipeline.start(realsense_config)
     depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
     align = rs.align(rs.stream.color)
-    n_rows = 3
-    n_cols = 3
-    max_range = 3
     pwm_outputs = get_pwm_outputs()
+    section_coords = get_sections(run_config)
     
     try:
         while True:
@@ -41,7 +60,7 @@ def run_stereo():
             depth_image = np.asanyarray(depth_frame.get_data())
             color_image = np.asanyarray(color_frame.get_data())
             
-            tile_avgs = average_tiles(depth_image, n_rows, n_cols, max_range, depth_scale)
+            tile_avgs = average_tiles(depth_image, section_coords, run_config.max_range, depth_scale)
             for pwm, tile_avg in zip(pwm_outputs, tile_avgs):
                 pwm.value = 1 - tile_avg
                 
